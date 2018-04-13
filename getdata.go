@@ -21,13 +21,12 @@ type Job struct {
 
 func GetData() []Pipeline {
 	pipelines := make([]Pipeline, 0, 0)
-	if err := GetJSON("https://"+hostName+"/api/v1/pipelines", &pipelines); err != nil {
+	if err := GetJSON("/api/v1/pipelines", &pipelines); err != nil {
 		panic(err)
 	}
 	for idx, pipeline := range pipelines {
 		url := fmt.Sprintf(
-			"https://%s/api/v1/teams/%s/pipelines/%s/jobs",
-			hostName,
+			"/api/v1/teams/%s/pipelines/%s/jobs",
 			pipeline.TeamName,
 			pipeline.Name,
 		)

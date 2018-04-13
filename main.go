@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"image/color"
 	"io/ioutil"
 	"math"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -18,9 +22,15 @@ import (
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
+	yaml "gopkg.in/yaml.v2"
 )
 
-var hostName string
+type Target struct {
+	Api         string
+	BearerToken string
+}
+
+var target Target
 var statuses = []string{"aborted", "errored", "failed", "succeeded"}
 var colors = map[string]color.RGBA{
 	"bg":        color.RGBA{39, 55, 71, 255},
@@ -98,8 +108,8 @@ func run() {
 			if idx < len(data) {
 				val := data[idx]
 				url := fmt.Sprintf(
-					"https://%s/teams/%s/pipelines/%s", // "?groups=java",
-					hostName,
+					"%s/teams/%s/pipelines/%s", // "?groups=java",
+					target.Api,
 					val.TeamName,
 					val.Name,
 				)
@@ -128,7 +138,7 @@ func run() {
 					imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
 					imd.Rectangle(0)
 				}
-				imd.Color = color.RGBA{0, 0, 0, 255}
+				imd.Color = color.RGBA{0x5D, 0x6D, 0x7D, 0xff}
 				imd.Push(bounds.Min, bounds.Max)
 				imd.Rectangle(0)
 				total := 0
@@ -170,10 +180,10 @@ func run() {
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Printf("Usage %s [HOSTNAME]\n  eg. %s buildpacks.ci.cf-app.com\n", os.Args[0], os.Args[0])
+		fmt.Printf("Usage %s [HOSTNAME or Fly Target]\n  eg. %s buildpacks.ci.cf-app.com\n", os.Args[0], os.Args[0])
 		os.Exit(1)
 	}
-	hostName = os.Args[1]
+	target = loadFlyRc(os.Args[1])
 
 	pixelgl.Run(run)
 }
@@ -199,4 +209,61 @@ func loadTTF(path string, size float64) (font.Face, error) {
 		Size:              size,
 		GlyphCacheEntries: 10,
 	}), nil
+}
+
+func loadFlyRc(target string) Target {
+	flyrc := struct {
+		Targets map[string]struct {
+			Api   string `yaml:"api"`
+			Token struct {
+				Type  string `yaml:"type"`
+				Value string `yaml:"value"`
+			} `yaml:"token"`
+		} `yaml:"targets"`
+	}{}
+	body, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".flyrc"))
+	if err != nil {
+		panic(err)
+	}
+	err = yaml.Unmarshal(body, &flyrc)
+	if err != nil {
+		panic(err)
+	}
+	if val, ok := flyrc.Targets[target]; ok {
+		return Target{Api: val.Api, BearerToken: val.Token.Value}
+	} else if strings.HasPrefix(target, "http") {
+		return Target{Api: target, BearerToken: ""}
+	} else {
+		fmt.Println("Target must be either a target in flyrc or a url")
+		os.Exit(2)
+		return Target{}
+	}
+}
+
+func GetJSON(path string, data interface{}) error {
+	client := http.Client{
+		Timeout: time.Second * 2, // Maximum of 2 secs
+	}
+
+	req, err := http.NewRequest(http.MethodGet, target.Api+path, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", "concourse-summary-gl")
+	if target.BearerToken != "" {
+		req.Header.Set("Authorization", "Bearer+"+target.BearerToken)
+	}
+
+	res, getErr := client.Do(req)
+	if getErr != nil {
+		return err
+	}
+
+	body, readErr := ioutil.ReadAll(res.Body)
+	if readErr != nil {
+		return err
+	}
+
+	return json.Unmarshal(body, data)
 }
