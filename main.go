@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image/color"
-	// _ "image/jpeg"
 	"io/ioutil"
 	"math"
 	"os"
@@ -74,11 +73,6 @@ func run() {
 		fmt.Println("Warning: could no load rubik.ttf:", err)
 		fontFace = basicfont.Face7x13
 	}
-	// picture, err := loadPicture("dog.jpg")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	panic("Could not load dog.jpg")
-	// }
 
 	fps := time.Tick(time.Second / 20)
 	for !win.Closed() {
@@ -144,9 +138,6 @@ func run() {
 				pos := bounds.Min
 				for _, key := range statuses {
 					if key == "succeeded" && datum.Statuses[key] == total {
-						// imd.Push(bounds.Min, bounds.Max)
-						// sprite := pixel.NewSprite(picture, picture.Bounds())
-						// sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
 						imd.Color = colors["green"]
 						imd.Push(bounds.Min, bounds.Max)
 						imd.Rectangle(0)
@@ -209,16 +200,3 @@ func loadTTF(path string, size float64) (font.Face, error) {
 		GlyphCacheEntries: 10,
 	}), nil
 }
-
-// func loadPicture(path string) (pixel.Picture, error) {
-// 	file, err := os.Open(path)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-// 	img, _, err := image.Decode(file)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return pixel.PictureDataFromImage(img), nil
-// }
