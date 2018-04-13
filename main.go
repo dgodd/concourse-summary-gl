@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image/color"
+	// _ "image/jpeg"
 	"io/ioutil"
 	"math"
 	"os"
@@ -30,6 +31,7 @@ var colors = map[string]color.RGBA{
 	"errored":   color.RGBA{0xE6, 0x7E, 0x21, 0xff},
 	"failed":    color.RGBA{0xE7, 0x4C, 0x3C, 0xff},
 	"succeeded": color.RGBA{0x2E, 0xCC, 0x71, 0xff},
+	"green":     color.RGBA{0x71, 0xDD, 0x71, 0xff},
 }
 
 func run() {
@@ -72,6 +74,11 @@ func run() {
 		fmt.Println("Warning: could no load rubik.ttf:", err)
 		fontFace = basicfont.Face7x13
 	}
+	// picture, err := loadPicture("dog.jpg")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	panic("Could not load dog.jpg")
+	// }
 
 	fps := time.Tick(time.Second / 20)
 	for !win.Closed() {
@@ -136,7 +143,14 @@ func run() {
 				}
 				pos := bounds.Min
 				for _, key := range statuses {
-					if datum.Statuses[key] > 0 {
+					if key == "succeeded" && datum.Statuses[key] == total {
+						// imd.Push(bounds.Min, bounds.Max)
+						// sprite := pixel.NewSprite(picture, picture.Bounds())
+						// sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+						imd.Color = colors["green"]
+						imd.Push(bounds.Min, bounds.Max)
+						imd.Rectangle(0)
+					} else if datum.Statuses[key] > 0 {
 						imd.Color = colors[key]
 						size := float64(datum.Statuses[key]) * bounds.W() / float64(total)
 						imd.Push(pos, pos.Add(pixel.V(size, bounds.H())))
@@ -195,3 +209,16 @@ func loadTTF(path string, size float64) (font.Face, error) {
 		GlyphCacheEntries: 10,
 	}), nil
 }
+
+// func loadPicture(path string) (pixel.Picture, error) {
+// 	file, err := os.Open(path)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer file.Close()
+// 	img, _, err := image.Decode(file)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return pixel.PictureDataFromImage(img), nil
+// }
