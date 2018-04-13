@@ -39,7 +39,7 @@ func run() {
 		Title:     "Concourse Summary",
 		Bounds:    pixel.R(0, 0, maxWidth, maxHeight),
 		Resizable: true,
-		VSync:     true,
+		VSync:     false,
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
@@ -75,6 +75,7 @@ func run() {
 		fontFace = basicfont.Face7x13
 	}
 
+	fps := time.Tick(time.Second / 2)
 	for !win.Closed() {
 		if maxWidth != win.Bounds().W() || maxHeight != win.Bounds().H() {
 			dataChanged = true
@@ -159,6 +160,7 @@ func run() {
 			}
 		}
 		win.Update()
+		<-fps
 	}
 }
 
