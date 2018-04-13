@@ -43,6 +43,14 @@ var colors = map[string]color.RGBA{
 	"green":     color.RGBA{0x71, 0xDD, 0x71, 0xff},
 }
 
+type Pipeline struct {
+	Name     string `json:"name"`
+	Paused   bool   `json:"paused"`
+	TeamName string `json:"team_name"`
+	Running  bool
+	Statuses map[string]int
+}
+
 func run() {
 	maxWidth := 900.0
 	maxHeight := 600.0
@@ -266,4 +274,39 @@ func GetJSON(path string, data interface{}) error {
 	}
 
 	return json.Unmarshal(body, data)
+}
+
+type Job struct {
+	NextBuild struct {
+		Status string `json:"status"`
+	} `json:"next_build"`
+	Build struct {
+		Status string `json:"status"`
+	} `json:"finished_build"`
+}
+
+func GetData() []Pipeline {
+	pipelines := make([]Pipeline, 0, 0)
+	if err := GetJSON("/api/v1/pipelines", &pipelines); err != nil {
+		panic(err)
+	}
+	for idx, pipeline := range pipelines {
+		url := fmt.Sprintf(
+			"/api/v1/teams/%s/pipelines/%s/jobs",
+			pipeline.TeamName,
+			pipeline.Name,
+		)
+		jobs := make([]Job, 0, 0)
+		if err := GetJSON(url, &jobs); err != nil {
+			panic(err)
+		}
+		pipelines[idx].Statuses = map[string]int{}
+		for _, job := range jobs {
+			pipelines[idx].Statuses[job.Build.Status]++
+			if job.NextBuild.Status != "" {
+				pipelines[idx].Running = true
+			}
+		}
+	}
+	return pipelines
 }

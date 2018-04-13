@@ -5,7 +5,13 @@ Provides a concourse summary as a desktop app
 ## Build and run
 
 ```
-go build -ldflags="-s -w" -o disp http.go main.go getdata.go && ./disp buildpacks.ci.cf-app.com
+go build -ldflags="-s -w" -o disp main.go && ./disp buildpacks.ci.cf-app.com
+```
+
+or if "ci" is a target in your flyrc file
+
+```
+go run main.go ci
 ```
 
 ## With Thanks
