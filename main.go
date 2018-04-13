@@ -52,13 +52,11 @@ func run() {
 	go func() {
 		for range time.Tick(time.Second) {
 			atomic.AddInt32(&countdown, -1)
-			win.SetTitle(fmt.Sprintf("Concourse Summary (%d)", countdown))
 		}
 	}()
 	refreshData := func() {
 		data = GetData()
 		atomic.StoreInt32(&countdown, 30)
-		win.SetTitle(fmt.Sprintf("Concourse Summary (%d)", countdown))
 		dataChanged = true
 	}
 	go func() {
@@ -75,13 +73,14 @@ func run() {
 		fontFace = basicfont.Face7x13
 	}
 
-	fps := time.Tick(time.Second / 2)
+	fps := time.Tick(time.Second / 20)
 	for !win.Closed() {
+		win.SetTitle(fmt.Sprintf("Concourse Summary (%d)", countdown))
 		if maxWidth != win.Bounds().W() || maxHeight != win.Bounds().H() {
 			dataChanged = true
+			maxWidth = win.Bounds().W()
+			maxHeight = win.Bounds().H()
 		}
-		maxWidth = win.Bounds().W()
-		maxHeight = win.Bounds().H()
 		w, h, perRow := maxWidth, maxHeight, 1.0
 		if len(data) > 0 {
 			perRow = math.Ceil(math.Sqrt(float64(len(data))))
