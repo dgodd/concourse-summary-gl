@@ -33,7 +33,6 @@ var colors = map[string]color.RGBA{
 }
 
 func run() {
-	data := make([]Pipeline, 0, 0)
 	maxWidth := 900.0
 	maxHeight := 600.0
 	cfg := pixelgl.WindowConfig{
@@ -47,18 +46,25 @@ func run() {
 		panic(err)
 	}
 
-	var countdown int32 = 0
+	data := make([]Pipeline, 0, 0)
+	dataChanged := true
+	countdown := int32(0)
 	go func() {
 		for range time.Tick(time.Second) {
 			atomic.AddInt32(&countdown, -1)
+			win.SetTitle(fmt.Sprintf("Concourse Summary (%d)", countdown))
 		}
 	}()
-	go func() {
+	refreshData := func() {
 		data = GetData()
 		atomic.StoreInt32(&countdown, 30)
+		win.SetTitle(fmt.Sprintf("Concourse Summary (%d)", countdown))
+		dataChanged = true
+	}
+	go func() {
+		refreshData()
 		for range time.Tick(30 * time.Second) {
-			data = GetData()
-			atomic.StoreInt32(&countdown, 30)
+			refreshData()
 		}
 	}()
 
@@ -70,6 +76,9 @@ func run() {
 	}
 
 	for !win.Closed() {
+		if maxWidth != win.Bounds().W() || maxHeight != win.Bounds().H() {
+			dataChanged = true
+		}
 		maxWidth = win.Bounds().W()
 		maxHeight = win.Bounds().H()
 		w, h, perRow := maxWidth, maxHeight, 1.0
@@ -98,56 +107,57 @@ func run() {
 			}
 		}
 
-		win.SetTitle(fmt.Sprintf("Concourse Summary (%d)", countdown))
-		win.Clear(colors["bg"])
+		if dataChanged {
+			dataChanged = false
+			win.Clear(colors["bg"])
 
-		for idx, datum := range data {
-			col := float64(idx % int(perRow))
-			row := float64(idx / int(perRow))
-			bounds := pixel.R((col*w)+10, maxHeight-(row*h)-10, ((col+1)*w)-10, maxHeight-((row+1)*h)+10)
+			for idx, datum := range data {
+				col := float64(idx % int(perRow))
+				row := float64(idx / int(perRow))
+				bounds := pixel.R((col*w)+10, maxHeight-(row*h)-10, ((col+1)*w)-10, maxHeight-((row+1)*h)+10)
 
-			imd := imdraw.New(nil)
-			if datum.Paused {
-				imd.Color = colors["paused"]
-				imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
-				imd.Rectangle(0)
-			}
-			if datum.Running {
-				imd.Color = colors["running"]
-				imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
-				imd.Rectangle(0)
-			}
-			imd.Color = color.RGBA{0, 0, 0, 255}
-			imd.Push(bounds.Min, bounds.Max)
-			imd.Rectangle(0)
-			total := 0
-			for _, val := range datum.Statuses {
-				total += val
-			}
-			pos := bounds.Min
-			for _, key := range statuses {
-				if datum.Statuses[key] > 0 {
-					imd.Color = colors[key]
-					size := float64(datum.Statuses[key]) * bounds.W() / float64(total)
-					imd.Push(pos, pos.Add(pixel.V(size, bounds.H())))
+				imd := imdraw.New(nil)
+				if datum.Paused {
+					imd.Color = colors["paused"]
+					imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
 					imd.Rectangle(0)
-					pos = pos.Add(pixel.V(size, 0))
 				}
-			}
+				if datum.Running {
+					imd.Color = colors["running"]
+					imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
+					imd.Rectangle(0)
+				}
+				imd.Color = color.RGBA{0, 0, 0, 255}
+				imd.Push(bounds.Min, bounds.Max)
+				imd.Rectangle(0)
+				total := 0
+				for _, val := range datum.Statuses {
+					total += val
+				}
+				pos := bounds.Min
+				for _, key := range statuses {
+					if datum.Statuses[key] > 0 {
+						imd.Color = colors[key]
+						size := float64(datum.Statuses[key]) * bounds.W() / float64(total)
+						imd.Push(pos, pos.Add(pixel.V(size, bounds.H())))
+						imd.Rectangle(0)
+						pos = pos.Add(pixel.V(size, 0))
+					}
+				}
 
-			atlas := text.NewAtlas(fontFace, text.ASCII)
-			txt := text.New(bounds.Center().Add(pixel.V(0, -2)), atlas)
-			txt.Color = colornames.White
-			txt.Dot.X -= txt.BoundsOf(datum.Name).W() / 2
-			fmt.Fprintln(txt, datum.Name)
-			imd.Draw(win)
-			txtScale := 1.0
-			if (txt.BoundsOf(datum.Name).W() + 20.0) > bounds.W() {
-				txtScale = bounds.W() / (txt.BoundsOf(datum.Name).W() + 20.0)
+				atlas := text.NewAtlas(fontFace, text.ASCII)
+				txt := text.New(bounds.Center().Add(pixel.V(0, -2)), atlas)
+				txt.Color = colornames.White
+				txt.Dot.X -= txt.BoundsOf(datum.Name).W() / 2
+				fmt.Fprintln(txt, datum.Name)
+				imd.Draw(win)
+				txtScale := 1.0
+				if (txt.BoundsOf(datum.Name).W() + 20.0) > bounds.W() {
+					txtScale = bounds.W() / (txt.BoundsOf(datum.Name).W() + 20.0)
+				}
+				txt.Draw(win, pixel.IM.Scaled(bounds.Center(), txtScale))
 			}
-			txt.Draw(win, pixel.IM.Scaled(bounds.Center(), txtScale))
 		}
-
 		win.Update()
 	}
 }
