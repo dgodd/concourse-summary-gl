@@ -44,9 +44,9 @@ var colors = map[string]color.RGBA{
 }
 
 type Pipeline struct {
-	Name     string `json:"name"`
-	Paused   bool   `json:"paused"`
-	TeamName string `json:"team_name"`
+	Name     string
+	Paused   bool
+	TeamName string
 	Running  bool
 	Statuses map[string]int
 }
@@ -155,7 +155,7 @@ func run() {
 				}
 				pos := bounds.Min
 				for _, key := range statuses {
-					if key == "succeeded" && datum.Statuses[key] == total {
+					if key == "succeeded" && datum.Statuses[key] == total && total > 0 {
 						imd.Color = colors["green"]
 						imd.Push(bounds.Min, bounds.Max)
 						imd.Rectangle(0)
@@ -277,6 +277,9 @@ func GetJSON(path string, data interface{}) error {
 }
 
 type Job struct {
+	Name      string `json:"name"`
+	Pipeline  string `json:"pipeline_name"`
+	Team      string `json:"team_name"`
 	NextBuild struct {
 		Status string `json:"status"`
 	} `json:"next_build"`
@@ -290,23 +293,25 @@ func GetData() []Pipeline {
 	if err := GetJSON("/api/v1/pipelines", &pipelines); err != nil {
 		panic(err)
 	}
-	for idx, pipeline := range pipelines {
-		url := fmt.Sprintf(
-			"/api/v1/teams/%s/pipelines/%s/jobs",
-			pipeline.TeamName,
-			pipeline.Name,
-		)
-		jobs := make([]Job, 0, 0)
-		if err := GetJSON(url, &jobs); err != nil {
-			panic(err)
-		}
-		pipelines[idx].Statuses = map[string]int{}
-		for _, job := range jobs {
-			pipelines[idx].Statuses[job.Build.Status]++
+	lookup := make(map[string]*Pipeline)
+	for i, _ := range pipelines {
+		p := &pipelines[i]
+		p.Statuses = make(map[string]int)
+		lookup[p.Name] = p
+	}
+
+	jobs := make([]Job, 0, 0)
+	if err := GetJSON("/api/v1/jobs", &jobs); err != nil {
+		panic(err)
+	}
+	for _, job := range jobs {
+		if p := lookup[job.Pipeline]; p != nil {
+			p.Statuses[job.Build.Status]++
 			if job.NextBuild.Status != "" {
-				pipelines[idx].Running = true
+				p.Running = true
 			}
 		}
 	}
+
 	return pipelines
 }
