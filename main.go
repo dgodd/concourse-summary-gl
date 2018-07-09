@@ -31,16 +31,17 @@ type Target struct {
 }
 
 var target Target
-var statuses = []string{"aborted", "errored", "failed", "succeeded"}
+var statuses = []string{"aborted", "errored", "failed", "succeeded", "paused"}
 var colors = map[string]color.RGBA{
-	"bg":        color.RGBA{39, 55, 71, 255},
-	"paused":    color.RGBA{0x34, 0x98, 0xDB, 0xff},
-	"running":   color.RGBA{0xF2, 0xC5, 0x00, 0xff},
-	"aborted":   color.RGBA{0x8F, 0x4B, 0x2D, 0xff},
-	"errored":   color.RGBA{0xE6, 0x7E, 0x21, 0xff},
-	"failed":    color.RGBA{0xE7, 0x4C, 0x3C, 0xff},
-	"succeeded": color.RGBA{0x2E, 0xCC, 0x71, 0xff},
-	"green":     color.RGBA{0x71, 0xDD, 0x71, 0xff},
+	"bg":           color.RGBA{39, 55, 71, 255},
+	"paused":       color.RGBA{0x44, 0xA8, 0xEB, 0xff},
+	"pausedBorder": color.RGBA{0x34, 0x98, 0xDB, 0xff},
+	"running":      color.RGBA{0xF2, 0xC5, 0x00, 0xff},
+	"aborted":      color.RGBA{0x8F, 0x4B, 0x2D, 0xff},
+	"errored":      color.RGBA{0xE6, 0x7E, 0x21, 0xff},
+	"failed":       color.RGBA{0xE7, 0x4C, 0x3C, 0xff},
+	"succeeded":    color.RGBA{0x2E, 0xCC, 0x71, 0xff},
+	"green":        color.RGBA{0x71, 0xDD, 0x71, 0xff},
 }
 
 type Pipeline struct {
@@ -104,7 +105,8 @@ func run() {
 		if len(data) > 0 {
 			perRow = math.Ceil(math.Sqrt(float64(len(data))))
 			w = maxWidth / perRow
-			h = maxHeight / perRow
+			numRows := math.Ceil(float64(len(data)) / float64(perRow))
+			h = maxHeight / numRows
 		}
 
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
@@ -137,11 +139,10 @@ func run() {
 
 				imd := imdraw.New(nil)
 				if datum.Paused {
-					imd.Color = colors["paused"]
+					imd.Color = colors["pausedBorder"]
 					imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
 					imd.Rectangle(0)
-				}
-				if datum.Running {
+				} else if datum.Running {
 					imd.Color = colors["running"]
 					imd.Push(bounds.Min.Add(pixel.V(-10, 10)), bounds.Max.Add(pixel.V(10, -10)))
 					imd.Rectangle(0)
@@ -268,6 +269,10 @@ func GetJSON(path string, data interface{}) error {
 		return err
 	}
 
+	if res.StatusCode != 200 {
+		return fmt.Errorf("Received %d from %s", res.StatusCode, path)
+	}
+
 	body, readErr := ioutil.ReadAll(res.Body)
 	if readErr != nil {
 		return err
@@ -280,6 +285,7 @@ type Job struct {
 	Name      string `json:"name"`
 	Pipeline  string `json:"pipeline_name"`
 	Team      string `json:"team_name"`
+	Paused    bool   `json:"paused"`
 	NextBuild struct {
 		Status string `json:"status"`
 	} `json:"next_build"`
@@ -306,12 +312,17 @@ func GetData() []Pipeline {
 	}
 	for _, job := range jobs {
 		if p := lookup[job.Pipeline]; p != nil {
-			p.Statuses[job.Build.Status]++
-			if job.NextBuild.Status != "" {
-				p.Running = true
+			if job.Paused {
+				p.Statuses["paused"]++
+			} else {
+				p.Statuses[job.Build.Status]++
+				if job.NextBuild.Status != "" {
+					p.Running = true
+				}
 			}
 		}
 	}
 
+	fmt.Println(pipelines)
 	return pipelines
 }
