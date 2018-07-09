@@ -48,9 +48,9 @@ var colors = map[string]color.RGBA{
 }
 
 type Pipeline struct {
-	Name     string
-	Paused   bool
-	TeamName string
+	Name     string `json:"name"`
+	Paused   bool   `json:"paused"`
+	TeamName string `json:"team_name"`
 	Running  bool
 	Statuses map[string]int
 }
