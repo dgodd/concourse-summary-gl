@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,6 +32,8 @@ type Target struct {
 }
 
 var target Target
+var refreshTimeout int32
+
 var statuses = []string{"aborted", "errored", "failed", "succeeded", "paused"}
 var colors = map[string]color.RGBA{
 	"bg":           color.RGBA{39, 55, 71, 255},
@@ -76,12 +79,12 @@ func run() {
 	}()
 	refreshData := func() {
 		data = GetData()
-		atomic.StoreInt32(&countdown, 2)
+		atomic.StoreInt32(&countdown, refreshTimeout)
 		dataChanged = true
 	}
 	go func() {
 		refreshData()
-		for range time.Tick(2 * time.Second) {
+		for range time.Tick(time.Duration(refreshTimeout) * time.Second) {
 			refreshData()
 		}
 	}()
@@ -188,11 +191,21 @@ func run() {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Printf("Usage %s [HOSTNAME or Fly Target]\n  eg. %s buildpacks.ci.cf-app.com\n", os.Args[0], os.Args[0])
+	if len(os.Args) < 2 {
+		fmt.Printf("Usage %s [HOSTNAME or Fly Target] [Refresh Timeout]\n  eg. %s buildpacks.ci.cf-app.com\n", os.Args[0], os.Args[0])
 		os.Exit(1)
 	}
 	target = loadFlyRc(os.Args[1])
+
+	if len(os.Args) == 3 {
+		if i, err := strconv.Atoi(os.Args[2]); err != nil {
+			panic(err)
+		} else {
+			refreshTimeout = int32(i)
+		}
+	} else {
+		refreshTimeout = 10
+	}
 
 	pixelgl.Run(run)
 }
