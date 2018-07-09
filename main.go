@@ -76,12 +76,12 @@ func run() {
 	}()
 	refreshData := func() {
 		data = GetData()
-		atomic.StoreInt32(&countdown, 30)
+		atomic.StoreInt32(&countdown, 2)
 		dataChanged = true
 	}
 	go func() {
 		refreshData()
-		for range time.Tick(30 * time.Second) {
+		for range time.Tick(2 * time.Second) {
 			refreshData()
 		}
 	}()
@@ -323,6 +323,5 @@ func GetData() []Pipeline {
 		}
 	}
 
-	fmt.Println(pipelines)
 	return pipelines
 }
