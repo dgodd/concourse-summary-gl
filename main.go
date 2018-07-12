@@ -35,6 +35,9 @@ type Target struct {
 
 var target Target
 var refreshTimeout int32
+var httpClient = http.Client{
+	Timeout: time.Second * 2, // Maximum of 2 secs
+}
 
 var statuses = []string{"aborted", "errored", "failed", "succeeded", "paused"}
 var colors = map[string]color.RGBA{
@@ -293,10 +296,6 @@ func loadFlyRc(target string) Target {
 }
 
 func GetJSON(path string, data interface{}) error {
-	client := http.Client{
-		Timeout: time.Second * 2, // Maximum of 2 secs
-	}
-
 	req, err := http.NewRequest(http.MethodGet, target.Api+path, nil)
 	if err != nil {
 		return err
@@ -307,7 +306,7 @@ func GetJSON(path string, data interface{}) error {
 		req.Header.Set("Authorization", "Bearer+"+target.BearerToken)
 	}
 
-	res, getErr := client.Do(req)
+	res, getErr := httpClient.Do(req)
 	if getErr != nil {
 		return err
 	}
