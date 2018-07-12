@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"io/ioutil"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
+	"github.com/fsnotify/fsnotify"
 	"github.com/golang/freetype/truetype"
 	"github.com/skratchdot/open-golang/open"
 	"golang.org/x/image/colornames"
@@ -195,11 +197,14 @@ func main() {
 		fmt.Printf("Usage %s [HOSTNAME or Fly Target] [Refresh Timeout]\n  eg. %s buildpacks.ci.cf-app.com\n", os.Args[0], os.Args[0])
 		os.Exit(1)
 	}
-	target = loadFlyRc(os.Args[1])
+
+	if err := watchFlyRc(os.Args[1]); err != nil {
+		log.Fatal(err)
+	}
 
 	if len(os.Args) == 3 {
 		if i, err := strconv.Atoi(os.Args[2]); err != nil {
-			panic(err)
+			log.Fatal(err)
 		} else {
 			refreshTimeout = int32(i)
 		}
@@ -231,6 +236,31 @@ func loadTTF(path string, size float64) (font.Face, error) {
 		Size:              size,
 		GlyphCacheEntries: 10,
 	}), nil
+}
+
+func watchFlyRc(name string) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events:
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					target = loadFlyRc(name)
+				}
+			case err := <-watcher.Errors:
+				log.Println("error:", err)
+			}
+		}
+	}()
+	err = watcher.Add(filepath.Join(os.Getenv("HOME"), ".flyrc"))
+	if err != nil {
+		return err
+	}
+	target = loadFlyRc(name)
+	return nil
 }
 
 func loadFlyRc(target string) Target {
