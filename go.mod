@@ -12,7 +12,7 @@ require (
 	github.com/pkg/errors v0.8.0
 	github.com/skratchdot/open-golang v0.0.0-20160302144031-75fb7ed4208c
 	golang.org/x/image v0.0.0-20180708004352-c73c2afc3b81
-	golang.org/x/sys v0.0.0-20180709060233-1b2967e3c290
+	golang.org/x/sys v0.0.0-20180715085529-ac767d655b30
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/yaml.v2 v2.2.1
 )
